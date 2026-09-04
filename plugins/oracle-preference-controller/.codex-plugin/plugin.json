@@ -1,0 +1,18 @@
+{
+  "name": "oracle-preference-controller",
+  "version": "0.1.0",
+  "description": "Configure and govern Oracle Database and APEXlang project preferences in Codex.",
+  "author": {
+    "name": "Oracle Preference Controller contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Oracle Preference Controller",
+    "shortDescription": "Govern Oracle DB and APEXlang project preferences.",
+    "longDescription": "Sets up Oracle projects, applies database and APEXlang preferences, and routes work to configured DB and APEX skills.",
+    "developerName": "Oracle Preference Controller contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Set up this Oracle Database or APEXlang project with OPC."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "oracle-preference-controller",
+  "interface": {
+    "displayName": "Oracle Preference Controller"
+  },
+  "plugins": [
+    {
+      "name": "oracle-preference-controller",
+      "source": {
+        "source": "local",
+        "path": "./plugins/oracle-preference-controller"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
