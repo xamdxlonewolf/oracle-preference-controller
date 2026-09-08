@@ -5,18 +5,49 @@ description: Configure and govern an Oracle Database project with optional APEXl
 
 # Oracle Preference Controller (OPC)
 
-Use OPC as the project entry point for Oracle database and APEX work. It owns project setup, preference enforcement, and safe routing; it does not replace the configured `/db` or `/apex` expertise.
+Use OPC as the project entry point for Oracle database and APEX work. It owns project setup, preference enforcement, reusable personal-rule selection, and safe routing; it does not replace the configured `/db` or `/apex` expertise.
 
 ## Non-negotiables
 
-- Find the nearest `oracle_project_config.toml` by walking upward from the current directory. Its directory is the project root. If none exists, initialize a project in the current directory **before doing work**.
+- Find the nearest `oracle_project_config.toml` by walking upward from the current directory. Its directory is the project root. Before project, database, or APEX work, initialize a project in the current directory if none exists. Managing the personal global rule library is the only exception and does not require a project config.
+- A personal global rule library is optional and is never a project base config. Offer its rules for explicit selection during new-project setup; do not silently apply them or change an existing project because the library changed.
 - Read valid config and apply relevant project rules before delegating. Project preferences override dependency defaults, never safety/security constraints.
-- Never store passwords, tokens, client secrets, certificates, private keys, or SAML material in config. Store aliases, IDs, paths, names, and non-secret object references only.
+- Never store passwords, tokens, client secrets, certificates, private keys, or SAML material in either config. Store aliases, IDs, paths, names, and non-secret object references only.
 - TOML has no `null`: omit unassigned optional keys. Omitted preferences inherit the relevant dependency default.
 - Do not silently select an ambiguous application, workspace, connection, path, authorization model, or destructive action. Ask.
 - A one-off task instruction is not a persisted rule unless the user explicitly asks to save/change a rule.
 
-## Config contract
+## Personal global rule library
+
+Use the personal file `$CODEX_HOME/oracle-preference-controller/global_config.toml`; when `CODEX_HOME` is unset, use `~/.codex/oracle-preference-controller/global_config.toml`. This file belongs to the current user, outside every project and outside source control. Do not put its path in a project config or create it in a repository.
+
+The library contains reusable **rule templates only**, not a second copy of a project configuration. In particular, it must not contain connection aliases, schemas, environments, workspaces, application keys or IDs, filesystem paths, project/app prefixes, authentication settings, authorization mappings, or other typed project preferences. Those facts are project-specific and must still be selected and verified per project.
+
+Use this shape, preserving unknown keys when safely editing an existing file:
+
+```toml
+global_config_version = 1
+
+[[rules]]
+name = "prefer_package_apis"
+scope = "database" # all | database | apex | shared
+description = "Prefer project-prefixed package APIs over standalone database routines."
+
+[[rules]]
+name = "document_security_exceptions"
+scope = "all"
+description = "Document the reason and approver for every security exception."
+```
+
+- A global rule has the same `name`, `scope`, and `description` contract as a project `[[rules]]` entry. Names must be unique within the library. Its scope may only be `all`, `database`, `apex`, or `shared`; it cannot name an application that may not exist in another project.
+- Create, add, edit, or remove a global rule only when the user explicitly asks to manage their global rules; this can be done without a current project. Show the exact global-file change and obtain confirmation immediately before writing it. Do not create an empty global file merely because it is absent.
+- When a user requests new-project setup and the library exists and validates, show its rule names, scopes, and descriptions. Let the user select **all**, an explicit named subset, or **none**. Copy only the selected entries into that project's `[[rules]]`; the global file is never linked or included at runtime.
+- If the library is absent, mention that the user can create reusable global rules, but continue setup without blocking. If it is invalid or uses an unsupported version, report the problem and do not offer it until repaired; the project can still be set up without global rules.
+- Applying global rules to an already configured project requires an explicit request. Do not re-prompt on ordinary project tasks. A later library change never updates any project automatically.
+- Before copying, compare rule names. Skip an identical project rule and report it. For a same-name rule with different scope or description, show both and ask whether to keep the project rule, replace it with the selected global rule, or rename the global rule for this project; never overwrite it silently. Resolve any selected-rule conflict with a typed project preference before saving.
+- Once copied, a global rule is an ordinary project rule. Editing or deleting it in one place has no effect on the other. The project config remains the complete record of rules governing that project.
+
+## Project config contract
 
 Use `config_version = 1`. Keep the file local and ensure project-root `.gitignore` contains exactly `/oracle_project_config.toml` (show the pending `.gitignore` edit and ask before writing it). Preserve unknown keys.
 
@@ -97,14 +128,15 @@ For a new APEX app, omit `application_id` and `path`, set `status = "new"`, then
 
 ## Initialize or repair
 
-1. **Existing config:** parse and validate it first. Invalid config must be repaired before project work. For an older but safely readable version, show a migration and ask before applying it. If the user asks to change a verifiable value, verify it first and show the evidence before saving.
-2. **Identity and connections:** default `project.name` from the root folder but let the user override it. Ask for the SQLcl alias and test it read-only (`SELECT 1 FROM dual` plus resolved schema). Try the alias first. On a TNS error only: use `$TNS_ADMIN`, then a previously configured exact path, then ask for an exact path. Never search or guess TNS locations.
-3. **Connection/schema overrides:** validate every app or environment override at least once. For existing projects, check representative configured/discovered objects too. Reject a wrong schema or missing expected objects; retain the prior verified value. New/empty schemas need connection/schema confirmation only.
-4. **Dependencies:** default to configured `db` and `apex` names. Report unresolved dependencies during setup but finish setup. At task time, stop if the needed skill cannot be resolved and tell the user to install it or update `[skills]`. `/db` is required for DB work. APEX normally requires both `/apex` and `/db`; if the user explicitly accepts the warning to continue without `/db`, record that acknowledgement and do not nag again. Resume using `/db` automatically once it resolves.
-5. **Database preferences:** ask whether the project is new or existing. For existing work, ask whether new objects inherit legacy conventions or use project rules; never change old objects without an explicit migration task. Offer a read-only convention scan only when the user wants it. Ask/confirm shared and app prefixes, PK strategy, audit names, and PL/SQL style. Suggest lowercase snake-case prefixes from the project/app names but never choose them silently.
-6. **Optional decisions:** absence means dependency defaults. Ask all relevant setup questions, but allow the user to defer nonessential preferences. Add a named scoped rule only when the user asks to persist it. If a custom rule conflicts with a typed preference, identify the conflict, ask which wins, repair config, then continue.
-7. **Filesystem records:** explicitly ask whether to keep DB objects on disk. Do not pick a default. If enabled, check for Git and offer `git init` when absent; never initialize Git silently. If disabled, DB changes still proceed normally but no deployable DB artifact exists.
-8. **APEX branch:** if disabled, do not request `/apex`; DB work remains available. If enabled, collect the exact workspace and verify it before live work. Require APEX 26.1+ / APEXlang before APEX work; pending validation may finish setup but blocks APEX tasks. Older APEX is outside OPC APEX scope: disable APEX for DB-only usage or use another workflow.
+1. **Existing project config:** parse and validate it first. Invalid config must be repaired before project work. For an older but safely readable version, show a migration and ask before applying it. If the user asks to change a verifiable value, verify it first and show the evidence before saving.
+2. **Personal rule selection:** for a new project, read and validate the optional global library, present its rules, and let the user select all, named rules, or none. Include the selected copied rules in the pending project-config diff. For an existing project, read or apply the library only when the user explicitly asks. A global-library failure must not prevent otherwise valid project setup.
+3. **Identity and connections:** default `project.name` from the root folder but let the user override it. Ask for the SQLcl alias and test it read-only (`SELECT 1 FROM dual` plus resolved schema). Try the alias first. On a TNS error only: use `$TNS_ADMIN`, then a previously configured exact path, then ask for an exact path. Never search or guess TNS locations.
+4. **Connection/schema overrides:** validate every app or environment override at least once. For existing projects, check representative configured/discovered objects too. Reject a wrong schema or missing expected objects; retain the prior verified value. New/empty schemas need connection/schema confirmation only.
+5. **Dependencies:** default to configured `db` and `apex` names. Report unresolved dependencies during setup but finish setup. At task time, stop if the needed skill cannot be resolved and tell the user to install it or update `[skills]`. `/db` is required for DB work. APEX normally requires both `/apex` and `/db`; if the user explicitly accepts the warning to continue without `/db`, record that acknowledgement and do not nag again. Resume using `/db` automatically once it resolves.
+6. **Database preferences:** ask whether the project is new or existing. For existing work, ask whether new objects inherit legacy conventions or use project rules; never change old objects without an explicit migration task. Offer a read-only convention scan only when the user wants it. Ask/confirm shared and app prefixes, PK strategy, audit names, and PL/SQL style. Suggest lowercase snake-case prefixes from the project/app names but never choose them silently.
+7. **Optional decisions:** absence means dependency defaults. Ask all relevant setup questions, but allow the user to defer nonessential preferences. Add a named scoped project rule only when the user asks to persist it; add a global rule only when they explicitly ask to manage their personal global library. If any project or selected global rule conflicts with a typed preference, identify the conflict, ask which wins, repair the project config, then continue.
+8. **Filesystem records:** explicitly ask whether to keep DB objects on disk. Do not pick a default. If enabled, check for Git and offer `git init` when absent; never initialize Git silently. If disabled, DB changes still proceed normally but no deployable DB artifact exists.
+9. **APEX branch:** if disabled, do not request `/apex`; DB work remains available. If enabled, collect the exact workspace and verify it before live work. Require APEX 26.1+ / APEXlang before APEX work; pending validation may finish setup but blocks APEX tasks. Older APEX is outside OPC APEX scope: disable APEX for DB-only usage or use another workflow.
 
 ## APEXlang projects
 
@@ -157,7 +189,7 @@ Use `.sql` for tables, sequences, views, triggers, indexes, and data; `.pks/.pkb
 
 ## Mutation gates and completion
 
-- Show a plan and get explicit confirmation immediately before authentication migration, destructive/data-transforming DB changes, enabling public/no-role access, creating proxy behavior, or writing a config preference/security rule.
+- Show a plan and get explicit confirmation immediately before authentication migration, destructive/data-transforming DB changes, enabling public/no-role access, creating proxy behavior, writing a project config preference/security rule, copying selected global rules into a project, or changing the personal global rule library.
 - Mechanical verified updates—assigned APEX IDs/paths, verification state, and last successful Beta commit—may be written after the user-requested operation and reported exactly.
 - If facts required for a high-impact decision cannot be validated, stop that operation and ask for the missing input. Do not guess.
-- On completion, report changed files, live actions taken, validations performed, pending warnings (missing skills/grants/verification), and any next explicit action required.
+- On completion, report changed files, live actions taken, validations performed, global rules created or copied (and rules skipped or conflicted), pending warnings (missing skills/grants/verification), and any next explicit action required.

@@ -1,6 +1,6 @@
 # Oracle Preference Controller
 
-**Oracle Preference Controller (OPC)** is a Codex plugin for setting up and governing Oracle Database projects with optional APEXlang applications. It stores project preferences locally, applies them before delegating work to Oracle DB/APEX skills, and keeps database/Apex conventions consistent.
+**Oracle Preference Controller (OPC)** is a Codex plugin for setting up and governing Oracle Database projects with optional APEXlang applications. It stores project preferences locally, can copy selected reusable personal rules into new projects, applies those preferences before delegating work to Oracle DB/APEX skills, and keeps database/APEX conventions consistent.
 
 ## Install
 
@@ -38,6 +38,19 @@ The local config is added to `.gitignore`; it must not contain passwords, tokens
 ```
 
 OPC asks for an application target whenever a multi-app project request is ambiguous. Project rules are persisted only when you explicitly ask OPC to save or change a rule.
+
+### Reusable personal global rules
+
+OPC can maintain an optional personal global rule library at:
+
+```text
+$CODEX_HOME/oracle-preference-controller/global_config.toml
+# or ~/.codex/oracle-preference-controller/global_config.toml when CODEX_HOME is unset
+```
+
+It contains reusable `[[rules]]` templates—not a second project config. During new-project setup, OPC shows the library and lets you select all, a named subset, or none. Selected rules are copied into that project's `oracle_project_config.toml`; they are never silently applied, linked, or retroactively synchronized.
+
+For example, ask OPC to “save this as a global rule” or “apply my global rules to this project.” It will show the exact change and ask before writing either config. The global library must not contain project-specific details such as connection aliases, schemas, workspaces, app IDs/keys, prefixes, paths, or secrets; those still require project-level selection and verification.
 
 ## Dependencies and scope
 
